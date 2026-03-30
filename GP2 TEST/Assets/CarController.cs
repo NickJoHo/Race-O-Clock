@@ -4,31 +4,83 @@ using UnityEngine;
 
 public class CarControlle : MonoBehaviour
 {
+    [Header("Movement Settings")]
     public float speed = 15.0f;
-    public float turnSpeed = 100.0f;
+    public float startDelay = 2.0f;
+
+    [Header("UI & Audio")]
+    public GameObject tintPanel; // Drag your Panel here
+
+    private AudioSource crashSound; // The AudioSource on THIS car
+    private bool canMove = false;
+
+    void Start()
+    {
+        // Gets the "Wasted" sound component from this car
+        crashSound = GetComponent<AudioSource>();
+
+        // Hide tint at start
+        if (tintPanel != null) tintPanel.SetActive(false);
+
+        Invoke("EnableMovement", startDelay);
+    }
 
     void Update()
     {
-        float moveInput = Input.GetAxis("Vertical");
-        float turnInput = Input.GetAxis("Horizontal");
-
-        // Move using 'right' for your 90-degree model
-        transform.Translate(Vector3.right * moveInput * speed * Time.deltaTime);
-
-        if (moveInput != 0)
+        if (canMove)
         {
-            transform.Rotate(Vector3.up, turnInput * turnSpeed * Time.deltaTime);
+            // Moves the car based on its local right (Red axis)
+            transform.Translate(Vector3.right * speed * Time.deltaTime);
         }
     }
 
-    // This part handles the specific freezing logic
+    void EnableMovement()
+    {
+        canMove = true;
+    }
+
     private void OnCollisionEnter(Collision collision)
     {
-        // Only freeze if the object we touched has the "Obstacle" tag
-        if (collision.gameObject.CompareTag("Obstacle"))
+        // Check if the car hit the Player
+        if (collision.gameObject.CompareTag("Player"))
         {
-            Time.timeScale = 0f; // Freeze the game
-            Debug.Log("Game Over! You hit: " + collision.gameObject.name);
+            StartCoroutine(WastedSequence());
         }
+    }
+
+    IEnumerator WastedSequence()
+    {
+        // 1. Play the "Wasted" sound effect
+        if (crashSound != null)
+        {
+            crashSound.Play();
+        }
+
+        // 2. Find the Background Music and Stop it
+        // Make sure your BGM object has the Tag "Music"
+        GameObject bgmObject = GameObject.FindWithTag("Music");
+        if (bgmObject != null)
+        {
+            AudioSource bgmSource = bgmObject.GetComponent<AudioSource>();
+            if (bgmSource != null)
+            {
+                bgmSource.Stop();
+            }
+        }
+
+        // 3. Show the Game Over / Tint Panel
+        if (tintPanel != null)
+        {
+            tintPanel.SetActive(true);
+        }
+
+        // 4. Wait for a tiny heartbeat so the sound actually starts
+        // We use Realtime because timeScale 0 will stop regular WaitForSeconds
+        yield return new WaitForSecondsRealtime(0.02f);
+
+        // 5. Freeze the game
+        Time.timeScale = 0f;
+
+        Debug.Log("Game Over: Time Frozen.");
     }
 }
